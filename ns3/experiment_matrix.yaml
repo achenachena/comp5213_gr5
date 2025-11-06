@@ -1,0 +1,23 @@
+# Referential experiment sweep definition consumed by tools/run_tcp_matrix.sh
+# Values here map directly to environment variables used by the automation script.
+scenarios:
+  - id: S1
+    description: ICCRG single bottleneck
+  - id: S2
+    description: Mixed RTT dumbbell with short flows
+  - id: S3
+    description: Random loss (wireless proxy)
+    loss_set: [0.0, 0.01, 0.05]
+  - id: S4
+    description: LTE-based blockage scenario using LteHelper (blockage duration controlled via --blockage)
+  - id: S5
+    description: Multi-flow scalability dumbbell
+
+algorithms:
+  baseline: [TcpNewReno, TcpCubic, TcpHybla, TcpHighSpeed]
+  advanced: [TcpBbr, QtColFair]
+
+sweep:
+  runs: 3
+  queue_size: 150p
+  flow_monitor: true
