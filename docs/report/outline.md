@@ -10,7 +10,7 @@
 - Table linking each prior work to the gaps our experiments address (fairness, automation, mmWave validation).
 
 ## 3. Methodology
-- Description of ns-3 environment (`~/ns3-workspace/ns-3`, compiler flags, version).
+- Description of ns-3 environment (`~/ns-3`, compiler flags, version).
 - Detailed explanation of `tcp_compare.cc` architecture, scenario parameters (refer to `ns3/experiment_plan.md`).
 - Automation tooling (`ns3/tools/run_tcp_matrix.sh`, configuration manifest).
 - Data collection and processing pipeline (`analysis/aggregate.sh`, metrics definitions, warm-up handling).

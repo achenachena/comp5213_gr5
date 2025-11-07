@@ -6,7 +6,7 @@
 
 ## Usage
 1. Run the simulation sweep (e.g. via `ns3/tools/run_tcp_matrix.sh`).
-2. Export `RESULT_ROOT` if ns-3 results are stored outside the default path (`~/ns3-workspace/ns-3/results`).
+2. Export `RESULT_ROOT` if ns-3 results are stored outside the default path (`~/ns-3/results`).
 3. Execute the aggregator:
    ```bash
    cd analysis

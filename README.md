@@ -1,6 +1,6 @@
 # Comparison of TCP Congestion Control Algorithms
 
-This repository hosts course project work for COMP5213 Group 5. Our goal is to reproduce, extend, and analyse recent research on TCP congestion control using the ns-3 network simulator.
+Course project for **COMP-5213-FDE – Computer Networks (Fall 2025), Lakehead University**. We develop and evaluate multi-scenario ns-3 simulations to study how different TCP congestion control algorithms behave across diverse network conditions.
 
 ---
 
@@ -55,7 +55,7 @@ Each scenario records congestion window traces and FlowMonitor statistics for po
 - GCC/Clang toolchain, CMake, and Python (ns-3 default requirements).  
 - Scenario S4 relies only on the stock `lte` module—no extra downloads needed.
 
-Ensure your ns-3 tree (e.g., `~/ns3-workspace/ns-3`) builds successfully before running the experiments.
+Ensure your ns-3 tree (e.g., `~/ns-3`) builds successfully before running the experiments.
 
 ---
 
@@ -64,13 +64,13 @@ Ensure your ns-3 tree (e.g., `~/ns3-workspace/ns-3`) builds successfully before 
 1. **Copy the scratch program**
 
    ```bash
-   cp ns3/tcp_compare.cc ~/ns3-workspace/ns-3/scratch/
+   cp ns3/tcp_compare.cc ~/ns-3/scratch/
    ```
 
 2. **Configure & build ns-3**
 
    ```bash
-   cd ~/ns3-workspace/ns-3
+   cd ~/ns-3
    ./ns3 configure          # add flags like --enable-examples as required
    ./ns3 build
    ```
@@ -81,7 +81,7 @@ Ensure your ns-3 tree (e.g., `~/ns3-workspace/ns-3`) builds successfully before 
    ./ns3 run "scratch/tcp_compare --scenario=S4 --tcp=TcpCubic --blockage=0.2"
    ```
 
-   Results are written to `~/ns3-workspace/ns-3/results/<scenario>/<tcp>/run-<n>/`.
+   Results are written to `~/ns-3/results/<scenario>/<tcp>/run-<n>/`.
 
 4. **Batch sweep**
 
@@ -118,15 +118,6 @@ Ensure your ns-3 tree (e.g., `~/ns3-workspace/ns-3`) builds successfully before 
 - **`docs/lit_review.md`** — detailed summaries, comparison tables, and experimental takeaways.  
 - **`docs/report/outline.md`** — structure for the written report (Introduction, Methodology, Results, etc.).  
 - **`docs/report/slides_outline.md`** — blueprint for the presentation deck.
-
----
-
-## Contributing
-
-1. Create a feature branch for each change.  
-2. Update `experiment_plan.md` and `experiment_matrix.yaml` when scenarios or metrics change.  
-3. Keep the literature review in sync if new papers inform the design.  
-4. Confirm `run_tcp_matrix.sh` and `analysis/aggregate.sh` still operate correctly after modifications.
 
 ---
 

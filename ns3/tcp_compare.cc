@@ -1,22 +1,22 @@
-#include "ns3/applications-module.h"
-#include "ns3/core-module.h"
-#include "ns3/error-model.h"
-#include "ns3/log.h"
-#include "ns3/flow-monitor-helper.h"
-#include "ns3/eps-bearer.h"
-#include "ns3/internet-module.h"
-#include "ns3/ipv4-global-routing-helper.h"
-#include "ns3/ipv4-static-routing-helper.h"
-#include "ns3/lte-helper.h"
-#include "ns3/mobility-helper.h"
-#include "ns3/point-to-point-epc-helper.h"
-#include "ns3/network-module.h"
-#include "ns3/point-to-point-channel.h"
-#include "ns3/point-to-point-dumbbell.h"
-#include "ns3/point-to-point-module.h"
-#include "ns3/point-to-point-net-device.h"
-#include "ns3/rng-seed-manager.h"
-#include "ns3/system-path.h"
+#include <ns3/applications-module.h>
+#include <ns3/core-module.h>
+#include <ns3/error-model.h>
+#include <ns3/log.h>
+#include <ns3/flow-monitor-helper.h>
+#include <ns3/eps-bearer.h>
+#include <ns3/internet-module.h>
+#include <ns3/ipv4-global-routing-helper.h>
+#include <ns3/ipv4-static-routing-helper.h>
+#include <ns3/lte-helper.h>
+#include <ns3/mobility-helper.h>
+#include <ns3/point-to-point-epc-helper.h>
+#include <ns3/network-module.h>
+#include <ns3/point-to-point-channel.h>
+#include <ns3/point-to-point-dumbbell.h>
+#include <ns3/point-to-point-module.h>
+#include <ns3/point-to-point-net-device.h>
+#include <ns3/rng-seed-manager.h>
+#include <ns3/system-path.h>
 
 #include <cstdint>
 #include <string>
@@ -258,7 +258,7 @@ BuildScenarioS2 (const RuntimeOptions &opts)
   Ipv4GlobalRoutingHelper::PopulateRoutingTables ();
 
   // Set up two long-lived TCP flows: leftHosts[i] -> rightHosts[i]
-  std::vector<Ipv4Address> rightHostAddrs = {
+  Ipv4Address rightHostAddrs[2] = {
       right0If.GetAddress (1),
       right1If.GetAddress (1),
   };

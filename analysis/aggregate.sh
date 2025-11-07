@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-RESULT_ROOT=${RESULT_ROOT:-$HOME/ns3-workspace/ns-3/results}
+RESULT_ROOT=${RESULT_ROOT:-$HOME/ns-3/results}
 OUTPUT_ROOT=${OUTPUT_ROOT:-$(pwd)/out}
 WARMUP=${WARMUP:-20}
 

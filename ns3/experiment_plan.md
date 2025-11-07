@@ -1,6 +1,6 @@
 # ns-3 Experiment Design: TCP Congestion Control Comparison
 
-Workspace: `~/ns3-workspace/ns-3`
+Workspace: `~/ns-3`
 
 ## 1. Algorithms Under Test
 - **Baseline**: `TcpNewReno`, `TcpCubic`, `TcpHybla`, `TcpHighSpeed` (all available in stock ns-3 per Casoni et al.).

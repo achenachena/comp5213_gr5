@@ -1,0 +1,10 @@
+compile_commands.json
+.cache/
+
+# Generated analysis outputs
+analysis/out/
+analysis/*.csv
+
+# Misc editor artifacts
+.DS_Store
+*.swp

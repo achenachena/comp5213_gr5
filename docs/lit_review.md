@@ -46,5 +46,5 @@
 - **Algorithm shortlist**: Start with ns-3 built-ins (NewReno, CUBIC, BBR if available, Hybla/HighSpeed) and add QtColFair or RL-inspired variants if feasible.  
 - **Scenario coverage**: Combine ICCRG suite topologies with disaster-style mmWave links to contrast wired vs. wireless extremes.  
 - **Metrics**: Beyond throughput, capture RTT distribution, queue occupancy, fairness (Jain index), and responsiveness to loss vs. delay signals.  
-- **Tooling**: Reuse or modernize the TCP Evaluation Suite scripts to automate batch runs; ensure compatibility with current ns-3 version (`~/ns3-workspace/ns-3`).  
+- **Tooling**: Reuse or modernize the TCP Evaluation Suite scripts to automate batch runs; ensure compatibility with current ns-3 version (`~/ns-3`).  
 - **Research gap**: None of the papers simultaneously examine fairness, latency, and adaptability across heterogeneous RTTs in ns-3—goal for our study.
