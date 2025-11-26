@@ -3,7 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 PROJECT_ROOT=$(cd "${SCRIPT_DIR}/.." && pwd)
-NS3_ROOT=${NS3_ROOT:-$HOME/ns3-workspace/ns-3}
+NS3_ROOT=${NS3_ROOT:-$HOME/ns-3}
 SCRATCH_PATH="${NS3_ROOT}/scratch"
 PROGRAM_NAME=${PROGRAM_NAME:-tcp_compare}
 SCENARIOS=${SCENARIOS:-"S1 S2 S3 S4 S5"}

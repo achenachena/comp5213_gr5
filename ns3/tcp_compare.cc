@@ -17,6 +17,9 @@
 #include <ns3/point-to-point-net-device.h>
 #include <ns3/rng-seed-manager.h>
 #include <ns3/system-path.h>
+#include <ns3/bulk-send-application.h>
+#include <ns3/onoff-application.h>
+#include <ns3/tcp-socket-base.h>
 
 #include <cstdint>
 #include <string>
@@ -82,14 +85,111 @@ static void
 CwndTracer (Ptr<OutputStreamWrapper> stream, uint32_t oldCwnd, uint32_t newCwnd)
 {
   *stream->GetStream () << Simulator::Now ().GetSeconds () << "," << oldCwnd << "," << newCwnd << std::endl;
+  stream->GetStream ()->flush ();
+}
+
+static bool g_cwndHeaderWritten = false;
+static bool g_cwndTracerConnected = false;
+
+static void
+WriteCwndHeader (Ptr<OutputStreamWrapper> stream)
+{
+  if (!g_cwndHeaderWritten)
+    {
+      *stream->GetStream () << "time,oldCwnd,newCwnd" << std::endl;
+      stream->GetStream ()->flush ();
+      g_cwndHeaderWritten = true;
+    }
+}
+
+static void
+TraceCwndFromApplication (Ptr<Application> app, Ptr<OutputStreamWrapper> stream)
+{
+  // Write header on first call
+  WriteCwndHeader (stream);
+  
+  if (g_cwndTracerConnected)
+    {
+      return; // Already connected
+    }
+  
+  // Try to get socket from BulkSendApplication
+  Ptr<BulkSendApplication> bulkApp = DynamicCast<BulkSendApplication> (app);
+  if (bulkApp)
+    {
+      // Try multiple times - socket might be created later
+      for (uint32_t i = 0; i < 10; ++i)
+        {
+          Ptr<Socket> socket = bulkApp->GetSocket ();
+          if (socket)
+            {
+              Ptr<TcpSocketBase> tcpSocket = DynamicCast<TcpSocketBase> (socket);
+              if (tcpSocket)
+                {
+                  tcpSocket->TraceConnectWithoutContext ("CongestionWindow", MakeBoundCallback (&CwndTracer, stream));
+                  g_cwndTracerConnected = true;
+                  return;
+                }
+            }
+          // Wait a bit and retry
+          Simulator::Schedule (Seconds (0.1 * (i + 1)), &TraceCwndFromApplication, app, stream);
+          return;
+        }
+    }
+  
+  // Try to get socket from OnOffApplication
+  Ptr<OnOffApplication> onoffApp = DynamicCast<OnOffApplication> (app);
+  if (onoffApp)
+    {
+      for (uint32_t i = 0; i < 10; ++i)
+        {
+          Ptr<Socket> socket = onoffApp->GetSocket ();
+          if (socket)
+            {
+              Ptr<TcpSocketBase> tcpSocket = DynamicCast<TcpSocketBase> (socket);
+              if (tcpSocket)
+                {
+                  tcpSocket->TraceConnectWithoutContext ("CongestionWindow", MakeBoundCallback (&CwndTracer, stream));
+                  g_cwndTracerConnected = true;
+                  return;
+                }
+            }
+          // Wait a bit and retry
+          Simulator::Schedule (Seconds (0.1 * (i + 1)), &TraceCwndFromApplication, app, stream);
+          return;
+        }
+    }
 }
 
 static void
 InstallCwndTracer (Ptr<Node> node, Ptr<OutputStreamWrapper> stream)
 {
-  const std::string path = "/NodeList/" + std::to_string (node->GetId ()) +
-                           "/$ns3::TcpL4Protocol/SocketList/*/CongestionWindow";
-  Config::ConnectWithoutContext (path, MakeBoundCallback (&CwndTracer, stream));
+  // Write header on first call
+  WriteCwndHeader (stream);
+  
+  if (g_cwndTracerConnected)
+    {
+      return;
+    }
+  
+  // Use Config::MatchContainer to find all TCP sockets and trace them
+  std::ostringstream oss;
+  oss << "/NodeList/" << node->GetId () << "/$ns3::TcpL4Protocol/SocketList/*/CongestionWindow";
+  Config::MatchContainer matches = Config::LookupMatches (oss.str ());
+  
+  for (uint32_t i = 0; i < matches.GetN (); ++i)
+    {
+      Ptr<Object> object = matches.Get (i);
+      Ptr<TcpSocketBase> tcpSocket = DynamicCast<TcpSocketBase> (object);
+      if (tcpSocket)
+        {
+          tcpSocket->TraceConnectWithoutContext ("CongestionWindow", MakeBoundCallback (&CwndTracer, stream));
+          g_cwndTracerConnected = true;
+        }
+    }
+  
+  // Also try the wildcard path as fallback
+  Config::ConnectWithoutContext (oss.str (), MakeBoundCallback (&CwndTracer, stream));
 }
 
 static void
@@ -124,9 +224,10 @@ InstallStacks (PointToPointDumbbellHelper &dumbbell)
   dumbbell.InstallStack (stack);
 }
 
-static void
+static ApplicationContainer
 InstallBulkTransfers (PointToPointDumbbellHelper &dumbbell, double start, double stop)
 {
+  ApplicationContainer allApps;
   uint16_t port = 5000;
   for (uint32_t i = 0; i < dumbbell.LeftCount (); ++i)
     {
@@ -135,13 +236,16 @@ InstallBulkTransfers (PointToPointDumbbellHelper &dumbbell, double start, double
       ApplicationContainer sinkApp = sinkHelper.Install (dumbbell.GetRight (i));
       sinkApp.Start (Seconds (start));
       sinkApp.Stop (Seconds (stop));
+      allApps.Add (sinkApp);
 
       BulkSendHelper bulkSender ("ns3::TcpSocketFactory", sinkAddress);
       bulkSender.SetAttribute ("MaxBytes", UintegerValue (0));
       ApplicationContainer senderApp = bulkSender.Install (dumbbell.GetLeft (i));
       senderApp.Start (Seconds (start));
       senderApp.Stop (Seconds (stop));
+      allApps.Add (senderApp);
     }
+  return allApps;
 }
 
 static void
@@ -166,6 +270,7 @@ InstallShortWebTraffic (Ptr<Node> client, Ptr<Node> server, Ipv4Address serverAd
 static void
 BuildScenarioS1 (const RuntimeOptions &opts)
 {
+  g_cwndTracerConnected = false; // Reset for each scenario
   PointToPointHelper access;
   access.SetDeviceAttribute ("DataRate", StringValue ("100Mbps"));
   access.SetChannelAttribute ("Delay", StringValue ("1ms"));
@@ -178,13 +283,26 @@ BuildScenarioS1 (const RuntimeOptions &opts)
   PointToPointDumbbellHelper dumbbell (2, access, 2, access, bottleneck);
   InstallStacks (dumbbell);
   AssignIpv4Addresses (dumbbell);
+  Ipv4GlobalRoutingHelper::PopulateRoutingTables ();
 
-  InstallBulkTransfers (dumbbell, 0.0, opts.simulationTime);
+  ApplicationContainer bulkApps = InstallBulkTransfers (dumbbell, 0.0, opts.simulationTime);
 
   AsciiTraceHelper ascii;
   const std::string outputDir = CreateOutputDir (opts);
   auto cwndStream = ascii.CreateFileStream (outputDir + "/cwnd.csv");
-  Simulator::Schedule (Seconds (0.1), &InstallCwndTracer, dumbbell.GetLeft (0), cwndStream);
+  // Trace cwnd from the first bulk send application (after socket is created)
+  if (bulkApps.GetN () > 1)
+    {
+      Ptr<Application> senderApp = bulkApps.Get (1); // Index 1 is first sender (0 is sink)
+      Simulator::Schedule (Seconds (0.5), &TraceCwndFromApplication, senderApp, cwndStream);
+      Simulator::Schedule (Seconds (1.0), &TraceCwndFromApplication, senderApp, cwndStream);
+      Simulator::Schedule (Seconds (2.0), &TraceCwndFromApplication, senderApp, cwndStream);
+    }
+  // Also try node-based tracing with multiple retries
+  for (double delay = 0.5; delay <= 3.0; delay += 0.5)
+    {
+      Simulator::Schedule (Seconds (delay), &InstallCwndTracer, dumbbell.GetLeft (0), cwndStream);
+    }
 
   FlowMonitorHelper flowmonHelper;
   Ptr<FlowMonitor> monitor;
@@ -207,6 +325,7 @@ BuildScenarioS1 (const RuntimeOptions &opts)
 static void
 BuildScenarioS2 (const RuntimeOptions &opts)
 {
+  g_cwndTracerConnected = false; // Reset for each scenario
   // Nodes: two sources, two sinks, and two routers forming the dumbbell backbone
   NodeContainer leftHosts;
   leftHosts.Create (2);
@@ -264,6 +383,7 @@ BuildScenarioS2 (const RuntimeOptions &opts)
   };
 
   uint16_t portBase = 5000;
+  ApplicationContainer bulkApps;
   for (uint32_t i = 0; i < 2; ++i)
     {
       Address sinkAddress (InetSocketAddress (rightHostAddrs[i], portBase + i));
@@ -271,12 +391,14 @@ BuildScenarioS2 (const RuntimeOptions &opts)
       ApplicationContainer sinkApp = sinkHelper.Install (rightHosts.Get (i));
       sinkApp.Start (Seconds (0.0));
       sinkApp.Stop (Seconds (opts.simulationTime));
+      bulkApps.Add (sinkApp);
 
       BulkSendHelper bulkHelper ("ns3::TcpSocketFactory", sinkAddress);
       bulkHelper.SetAttribute ("MaxBytes", UintegerValue (0));
       ApplicationContainer senderApp = bulkHelper.Install (leftHosts.Get (i));
       senderApp.Start (Seconds (0.0));
       senderApp.Stop (Seconds (opts.simulationTime));
+      bulkApps.Add (senderApp);
     }
 
   // Short web-style cross traffic
@@ -286,7 +408,15 @@ BuildScenarioS2 (const RuntimeOptions &opts)
   AsciiTraceHelper ascii;
   const std::string outputDir = CreateOutputDir (opts);
   auto cwndStream = ascii.CreateFileStream (outputDir + "/cwnd.csv");
-  Simulator::Schedule (Seconds (0.1), &InstallCwndTracer, leftHosts.Get (0), cwndStream);
+  // Trace cwnd from the first bulk send application
+  if (bulkApps.GetN () > 1)
+    {
+      Ptr<Application> senderApp = bulkApps.Get (1); // Index 1 is first sender
+      Simulator::Schedule (Seconds (0.5), &TraceCwndFromApplication, senderApp, cwndStream);
+      Simulator::Schedule (Seconds (1.0), &TraceCwndFromApplication, senderApp, cwndStream);
+    }
+  // Fallback
+  Simulator::Schedule (Seconds (1.0), &InstallCwndTracer, leftHosts.Get (0), cwndStream);
 
   FlowMonitorHelper flowmonHelper;
   Ptr<FlowMonitor> monitor;
@@ -309,6 +439,7 @@ BuildScenarioS2 (const RuntimeOptions &opts)
 static void
 BuildScenarioS3 (const RuntimeOptions &opts)
 {
+  g_cwndTracerConnected = false; // Reset for each scenario
   NodeContainer nodes;
   nodes.Create (4); // sender - router1 - router2 - receiver
 
@@ -377,7 +508,15 @@ BuildScenarioS3 (const RuntimeOptions &opts)
   AsciiTraceHelper ascii;
   const std::string outputDir = CreateOutputDir (opts);
   auto cwndStream = ascii.CreateFileStream (outputDir + "/cwnd.csv");
-  Simulator::Schedule (Seconds (0.1), &InstallCwndTracer, nodes.Get (0), cwndStream);
+  // Trace cwnd from the bulk send application
+  if (bulkApp.GetN () > 0)
+    {
+      Ptr<Application> senderApp = bulkApp.Get (0);
+      Simulator::Schedule (Seconds (0.5), &TraceCwndFromApplication, senderApp, cwndStream);
+      Simulator::Schedule (Seconds (1.0), &TraceCwndFromApplication, senderApp, cwndStream);
+    }
+  // Fallback
+  Simulator::Schedule (Seconds (1.0), &InstallCwndTracer, nodes.Get (0), cwndStream);
 
   FlowMonitorHelper flowmonHelper;
   Ptr<FlowMonitor> monitor;
@@ -400,6 +539,7 @@ BuildScenarioS3 (const RuntimeOptions &opts)
 static void
 BuildScenarioS5 (const RuntimeOptions &opts)
 {
+  g_cwndTracerConnected = false; // Reset for each scenario
   PointToPointHelper access, bottleneck;
   access.SetDeviceAttribute ("DataRate", StringValue ("100Mbps"));
   access.SetChannelAttribute ("Delay", StringValue ("2ms"));
@@ -412,12 +552,21 @@ BuildScenarioS5 (const RuntimeOptions &opts)
   PointToPointDumbbellHelper dumbbell (nFlows, access, nFlows, access, bottleneck);
   InstallStacks (dumbbell);
   AssignIpv4Addresses (dumbbell);
-  InstallBulkTransfers (dumbbell, 0.0, opts.simulationTime);
+  Ipv4GlobalRoutingHelper::PopulateRoutingTables ();
+  ApplicationContainer bulkApps = InstallBulkTransfers (dumbbell, 0.0, opts.simulationTime);
 
   AsciiTraceHelper ascii;
   const std::string outputDir = CreateOutputDir (opts);
   auto cwndStream = ascii.CreateFileStream (outputDir + "/cwnd.csv");
-  Simulator::Schedule (Seconds (0.1), &InstallCwndTracer, dumbbell.GetLeft (0), cwndStream);
+  // Trace cwnd from the first bulk send application
+  if (bulkApps.GetN () > 1)
+    {
+      Ptr<Application> senderApp = bulkApps.Get (1); // Index 1 is first sender
+      Simulator::Schedule (Seconds (0.5), &TraceCwndFromApplication, senderApp, cwndStream);
+      Simulator::Schedule (Seconds (1.0), &TraceCwndFromApplication, senderApp, cwndStream);
+    }
+  // Fallback
+  Simulator::Schedule (Seconds (1.0), &InstallCwndTracer, dumbbell.GetLeft (0), cwndStream);
 
   FlowMonitorHelper flowmonHelper;
   Ptr<FlowMonitor> monitor;
@@ -440,6 +589,7 @@ BuildScenarioS5 (const RuntimeOptions &opts)
 static void
 BuildScenarioS4 (const RuntimeOptions &opts)
 {
+  g_cwndTracerConnected = false; // Reset for each scenario
   Ptr<LteHelper> lteHelper = CreateObject<LteHelper> ();
   Ptr<PointToPointEpcHelper> epcHelper = CreateObject<PointToPointEpcHelper> ();
   lteHelper->SetEpcHelper (epcHelper);
@@ -548,7 +698,22 @@ BuildScenarioS4 (const RuntimeOptions &opts)
   AsciiTraceHelper ascii;
   const std::string outputDir = CreateOutputDir (opts);
   auto cwndStream = ascii.CreateFileStream (outputDir + "/cwnd.csv");
-  Simulator::Schedule (Seconds (0.1), &InstallCwndTracer, remoteHost, cwndStream);
+  // Trace cwnd from the bulk send application (starts at 5.0s)
+  if (bulkApp.GetN () > 0)
+    {
+      Ptr<Application> senderApp = bulkApp.Get (0);
+      Simulator::Schedule (Seconds (5.5), &TraceCwndFromApplication, senderApp, cwndStream);
+      Simulator::Schedule (Seconds (6.0), &TraceCwndFromApplication, senderApp, cwndStream);
+    }
+  // Also trace from video application
+  if (videoSource.GetN () > 0)
+    {
+      Ptr<Application> videoApp = videoSource.Get (0);
+      Simulator::Schedule (Seconds (1.5), &TraceCwndFromApplication, videoApp, cwndStream);
+      Simulator::Schedule (Seconds (2.0), &TraceCwndFromApplication, videoApp, cwndStream);
+    }
+  // Fallback
+  Simulator::Schedule (Seconds (6.0), &InstallCwndTracer, remoteHost, cwndStream);
 
   // Emulate temporary blockage by throttling the video stream
   Time blockStart = Seconds (30.0);

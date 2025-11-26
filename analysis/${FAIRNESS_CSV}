@@ -1,2 +1,9 @@
 scenario,tcp,run,jain_index
-S4,TcpCubic,1,0.295094
+S1,TcpNewReno,1,0.544704
+S1,TcpNewReno,2,0.544704
+S1,TcpCubic,1,0.545347
+S1,TcpCubic,2,0.545347
+S4,TcpNewReno,1,0.544541
+S4,TcpNewReno,2,0.544541
+S4,TcpCubic,1,0.549517
+S4,TcpCubic,2,0.549517

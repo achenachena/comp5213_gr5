@@ -1,10 +1,35 @@
+# Build and IDE artifacts
 compile_commands.json
 .cache/
+*.o
+*.a
+*.so
+*.dylib
 
 # Generated analysis outputs
 analysis/out/
 analysis/*.csv
+analysis/${FAIRNESS_CSV}
 
-# Misc editor artifacts
+# Python cache (if any Python scripts are added)
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+
+# Editor and OS artifacts
 .DS_Store
 *.swp
+*.swo
+*~
+.vscode/
+.idea/
+*.sublime-*
+
+# Log files
+*.log
+
+# Temporary files
+*.tmp
+*.bak
+*.backup
